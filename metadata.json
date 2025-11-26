@@ -1,0 +1,7 @@
+{
+  "name": "InStockAI",
+  "description": "Smart inventory tracker that predicts supply needs for cleaning businesses using Gemini AI.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}
