@@ -1,8 +1,8 @@
-import { GoogleGenAI, Type } from "@google/genai";
+import { GoogleGenAI, Type, HarmCategory, HarmBlockThreshold } from "@google/genai";
 import { InventoryItem, Job, Prediction } from "../types";
 
-// Initialize Gemini Client
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+// NOTE: We initialize the client INSIDE the functions now to prevent "White Screen" crashes
+// if the API key is missing or env vars haven't loaded yet during app startup.
 
 export const predictInventoryNeeds = async (
   inventory: InventoryItem[],
@@ -11,25 +11,28 @@ export const predictInventoryNeeds = async (
   
   if (inventory.length === 0) return [];
 
-  const prompt = `
-    You are an AI inventory manager for a commercial cleaning business in Kenya.
-    Your goal is to prevent 'pilferage' (theft) and ensure supplies don't run out.
-    
-    Current Stock:
-    ${JSON.stringify(inventory.map(i => ({ id: i.id, name: i.name, qty: i.quantity, unit: i.unit, min: i.minThreshold })))}
-
-    Upcoming Jobs Schedule (Next 7 days):
-    ${JSON.stringify(jobs.map(j => ({ type: j.type, date: j.date })))}
-
-    Task:
-    Analyze usage.
-    1. Calculate when items will run out.
-    2. If an item has VERY low stock but few upcoming jobs, mark it as "Critical" and mention "Suspicious usage detected" or "Potential waste" in the recommendation.
-    
-    Return a JSON array of predictions.
-  `;
-
   try {
+    // Initialize Gemini Client Lazily
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || '' });
+
+    const prompt = `
+      You are an AI inventory manager for a commercial cleaning business in Kenya.
+      Your goal is to prevent 'pilferage' (theft) and ensure supplies don't run out.
+      
+      Current Stock:
+      ${JSON.stringify(inventory.map(i => ({ id: i.id, name: i.name, qty: i.quantity, unit: i.unit, min: i.minThreshold })))}
+
+      Upcoming Jobs Schedule (Next 7 days):
+      ${JSON.stringify(jobs.map(j => ({ type: j.type, date: j.date })))}
+
+      Task:
+      Analyze usage.
+      1. Calculate when items will run out.
+      2. If an item has VERY low stock but few upcoming jobs, mark it as "Critical" and mention "Suspicious usage detected" or "Potential waste" in the recommendation.
+      
+      Return a JSON array of predictions.
+    `;
+
     const response = await ai.models.generateContent({
       model: "gemini-2.5-flash",
       contents: prompt,
@@ -64,6 +67,9 @@ export const predictInventoryNeeds = async (
 
 export const identifyItemFromImage = async (base64Image: string): Promise<{ name: string, category: string, quantityEstimate: number, confidence: string } | null> => {
   try {
+    // Initialize Gemini Client Lazily
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || '' });
+
     const response = await ai.models.generateContent({
       model: "gemini-2.5-flash",
       contents: {
@@ -101,10 +107,10 @@ export const identifyItemFromImage = async (base64Image: string): Promise<{ name
       config: {
         responseMimeType: "application/json",
         safetySettings: [
-          { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_NONE' },
-          { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_NONE' },
-          { category: 'HARM_CATEGORY_HATE_SPEECH', threshold: 'BLOCK_NONE' },
-          { category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT', threshold: 'BLOCK_NONE' }
+          { category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold: HarmBlockThreshold.BLOCK_NONE },
+          { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_NONE },
+          { category: HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold: HarmBlockThreshold.BLOCK_NONE },
+          { category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT, threshold: HarmBlockThreshold.BLOCK_NONE }
         ],
         responseSchema: {
           type: Type.OBJECT,
