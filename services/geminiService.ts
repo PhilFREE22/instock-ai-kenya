@@ -11,9 +11,15 @@ export const predictInventoryNeeds = async (
   
   if (inventory.length === 0) return [];
 
+  const apiKey = process.env.API_KEY;
+  if (!apiKey) {
+    console.error("API Key is missing. Please set API_KEY in your environment variables.");
+    return [];
+  }
+
   try {
     // Initialize Gemini Client Lazily
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || '' });
+    const ai = new GoogleGenAI({ apiKey });
 
     const prompt = `
       You are an AI inventory manager for a commercial cleaning business in Kenya.
@@ -66,9 +72,16 @@ export const predictInventoryNeeds = async (
 };
 
 export const identifyItemFromImage = async (base64Image: string): Promise<any> => {
+  const apiKey = process.env.API_KEY;
+  
+  // Explicit check to give a helpful error message to the user
+  if (!apiKey) {
+    return { error: "API Key Missing. Add 'API_KEY' in Vercel Settings & Redeploy." };
+  }
+
   try {
     // Initialize Gemini Client Lazily
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || '' });
+    const ai = new GoogleGenAI({ apiKey });
 
     const response = await ai.models.generateContent({
       model: "gemini-2.5-flash",
@@ -136,3 +149,4 @@ export const identifyItemFromImage = async (base64Image: string): Promise<any> =
     return { error: error.message || "Failed to analyze image" };
   }
 };
+
