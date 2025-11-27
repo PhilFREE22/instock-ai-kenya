@@ -43,14 +43,40 @@ export const Scanner: React.FC<ScannerProps> = ({ onScanComplete }) => {
 
   const capture = () => {
     if (videoRef.current && canvasRef.current) {
-      const context = canvasRef.current.getContext('2d');
+      const video = videoRef.current;
+      const canvas = canvasRef.current;
+      const context = canvas.getContext('2d');
+
       if (context) {
-        canvasRef.current.width = videoRef.current.videoWidth;
-        canvasRef.current.height = videoRef.current.videoHeight;
-        context.drawImage(videoRef.current, 0, 0);
-        const dataUrl = canvasRef.current.toDataURL('image/jpeg');
+        // Calculate scale to fit within max dimensions (e.g., 1024x1024) to reduce payload size
+        const MAX_SIZE = 1024;
+        let width = video.videoWidth;
+        let height = video.videoHeight;
+
+        if (width > height) {
+          if (width > MAX_SIZE) {
+            height *= MAX_SIZE / width;
+            width = MAX_SIZE;
+          }
+        } else {
+          if (height > MAX_SIZE) {
+            width *= MAX_SIZE / height;
+            height = MAX_SIZE;
+          }
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+
+        // Draw scaled image
+        context.drawImage(video, 0, 0, width, height);
+        
+        // Compress to JPEG with 0.8 quality to significantly reduce file size
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
+        
         setCapturedImage(dataUrl);
         stopCamera();
+        // Remove the data:image/jpeg;base64, prefix
         analyzeImage(dataUrl.split(',')[1]);
       }
     }
