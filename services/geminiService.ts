@@ -130,8 +130,11 @@ export const identifyItemFromImage = async (base64Image: string): Promise<{ name
     text = text.replace(/```json/g, '').replace(/```/g, '').trim();
     
     return JSON.parse(text);
-  } catch (error) {
+  } catch (error: any) {
     console.error("Gemini Vision Error:", error);
+    if (error.message?.includes('413')) {
+        console.error("Payload too large. Image resizing failed?");
+    }
     return null;
   }
 };
