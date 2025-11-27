@@ -44,56 +44,66 @@ export const Scanner: React.FC<ScannerProps> = ({ onScanComplete }) => {
   const capture = () => {
     if (videoRef.current && canvasRef.current) {
       const video = videoRef.current;
-      const canvas = canvasRef.current;
-      const context = canvas.getContext('2d');
+      
+      // CRITICAL CHECK: Ensure video has data before drawing
+      if (video.readyState === video.HAVE_ENOUGH_DATA && video.videoWidth > 0) {
+        const canvas = canvasRef.current;
+        const context = canvas.getContext('2d');
 
-      if (context) {
-        // Calculate scale to fit within max dimensions (e.g., 1024x1024) to reduce payload size
-        const MAX_SIZE = 1024;
-        let width = video.videoWidth;
-        let height = video.videoHeight;
+        if (context) {
+          // Calculate scale to fit within max dimensions (e.g., 1024x1024) to reduce payload size
+          const MAX_SIZE = 1024;
+          let width = video.videoWidth;
+          let height = video.videoHeight;
 
-        if (width > height) {
-          if (width > MAX_SIZE) {
-            height *= MAX_SIZE / width;
-            width = MAX_SIZE;
+          if (width > height) {
+            if (width > MAX_SIZE) {
+              height *= MAX_SIZE / width;
+              width = MAX_SIZE;
+            }
+          } else {
+            if (height > MAX_SIZE) {
+              width *= MAX_SIZE / height;
+              height = MAX_SIZE;
+            }
           }
-        } else {
-          if (height > MAX_SIZE) {
-            width *= MAX_SIZE / height;
-            height = MAX_SIZE;
-          }
+
+          // Use Math.floor to ensure integer dimensions
+          canvas.width = Math.floor(width);
+          canvas.height = Math.floor(height);
+
+          // Draw scaled image
+          context.drawImage(video, 0, 0, canvas.width, canvas.height);
+          
+          // Compress to JPEG with 0.8 quality to significantly reduce file size
+          const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
+          
+          setCapturedImage(dataUrl);
+          stopCamera();
+          // Remove the data:image/jpeg;base64, prefix
+          analyzeImage(dataUrl.split(',')[1]);
         }
-
-        canvas.width = width;
-        canvas.height = height;
-
-        // Draw scaled image
-        context.drawImage(video, 0, 0, width, height);
-        
-        // Compress to JPEG with 0.8 quality to significantly reduce file size
-        const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
-        
-        setCapturedImage(dataUrl);
-        stopCamera();
-        // Remove the data:image/jpeg;base64, prefix
-        analyzeImage(dataUrl.split(',')[1]);
+      } else {
+        console.warn("Camera not ready yet");
       }
     }
   };
 
   const analyzeImage = async (base64Data: string) => {
     setAnalyzing(true);
+    setResult(null); // Clear previous result
     try {
       const data = await identifyItemFromImage(base64Data);
-      if (data) {
+      
+      if (data && !data.error) {
         setResult(data);
         setManualQuantity(1); 
       } else {
-        setResult({ error: "Could not identify item. Try again." });
+        // Show the specific error from the API
+        setResult({ error: data?.error || "Could not identify item. Try again." });
       }
-    } catch (e) {
-      setResult({ error: "AI Service Error" });
+    } catch (e: any) {
+      setResult({ error: e.message || "AI Service Error" });
     } finally {
       setAnalyzing(false);
     }
@@ -164,7 +174,7 @@ export const Scanner: React.FC<ScannerProps> = ({ onScanComplete }) => {
             ) : result ? (
                 result.error ? (
                     <div className="text-center text-red-500 font-medium py-4">
-                        {result.error}
+                        <p className="mb-2 text-sm bg-red-50 p-2 rounded border border-red-100">{result.error}</p>
                         <button onClick={reset} className="flex items-center justify-center w-full mt-4 py-3 bg-slate-100 rounded-lg text-slate-700 font-medium">
                            <RefreshCw className="w-4 h-4 mr-2" /> Try Again
                         </button>
