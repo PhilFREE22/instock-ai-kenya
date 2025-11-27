@@ -65,7 +65,7 @@ export const predictInventoryNeeds = async (
   }
 };
 
-export const identifyItemFromImage = async (base64Image: string): Promise<{ name: string, category: string, quantityEstimate: number, confidence: string } | null> => {
+export const identifyItemFromImage = async (base64Image: string): Promise<any> => {
   try {
     // Initialize Gemini Client Lazily
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || '' });
@@ -125,16 +125,14 @@ export const identifyItemFromImage = async (base64Image: string): Promise<{ name
     });
 
     let text = response.text;
-    if (!text) return null;
+    if (!text) return { error: "No response from AI" };
     
     text = text.replace(/```json/g, '').replace(/```/g, '').trim();
     
     return JSON.parse(text);
   } catch (error: any) {
     console.error("Gemini Vision Error:", error);
-    if (error.message?.includes('413')) {
-        console.error("Payload too large. Image resizing failed?");
-    }
-    return null;
+    // Return the actual error message so the UI can show it
+    return { error: error.message || "Failed to analyze image" };
   }
 };
